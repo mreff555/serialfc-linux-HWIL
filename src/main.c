@@ -302,7 +302,7 @@ static struct file_operations serialfc_fops = {
 #endif
 };
 
-#if 0
+
 static int fc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct serialfc_card *new_card = 0;
@@ -318,7 +318,6 @@ static int fc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	return 0;
 }
-#endif
 
 static void fc_remove(struct pci_dev *pdev)
 {
@@ -337,7 +336,7 @@ static void fc_remove(struct pci_dev *pdev)
 
 struct pci_driver serialfc_pci_driver = {
 	.name = DEVICE_NAME,
-	//.probe = fc_probe,
+	.probe = fc_probe,
 	.remove = fc_remove,
 	.id_table = fc_id_table,
 };
