@@ -403,6 +403,9 @@ In Debian based distributions you can reconfigure the setserial package  and set
 dpkg-reconfigure setserial
 ```
 
+##### Why do my ports show up as 16550A in dmesg?
+In newer kernels, you may need to set CONFIG_SERIAL_8250_16550A_VARIANTS=y in the config in order for 
+the SuperFSCC and FSCC ports to show up as 16C950s.
 
 ## Build Dependencies
 - Kernel Build Tools (GCC, make, kernel headers, etc)
