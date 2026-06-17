@@ -130,6 +130,43 @@ enum FASTCOM_CARD_TYPE fastcom_get_card_type(struct serialfc_port *port)
     return fastcom_get_card_type2(port->card);
 }
 
+int serialfc_uart_register_supported(struct serialfc_port *port, int offset)
+{
+	enum FASTCOM_CARD_TYPE card_type;
+
+	return_val_if_untrue(port, 0);
+
+	card_type = fastcom_get_card_type(port);
+
+	if (card_type == CARD_TYPE_UNKNOWN)
+		return 0;
+
+	switch (offset) {
+	case UART_EXAR_FCTR:
+	case UART_EXAR_TXTRG:
+	case UART_EXAR_RXTRG:
+	case UART_EXAR_4XMODE:
+	case UART_EXAR_8XMODE:
+		return card_type == CARD_TYPE_PCI || card_type == CARD_TYPE_PCIe;
+	default:
+		return 1;
+	}
+}
+
+int serialfc_icr_register_supported(struct serialfc_port *port)
+{
+	return_val_if_untrue(port, 0);
+
+	return fastcom_get_card_type(port) == CARD_TYPE_FSCC;
+}
+
+int serialfc_bar2_fcr_supported(struct serialfc_port *port)
+{
+	return_val_if_untrue(port, 0);
+
+	return fastcom_get_card_type(port) == CARD_TYPE_FSCC && port->card->bar2;
+}
+
 int serialfc_set_uart_register(struct serialfc_port *port, unsigned offset,
 			       unsigned char value)
 {
@@ -261,6 +298,170 @@ int serialfc_uart_register_is_read_only(unsigned offset)
 	case MSR_OFFSET:
 		return 1;
 	}
+
+	return 0;
+}
+
+int serialfc_icr_register_is_write_only(unsigned char index)
+{
+	switch (index) {
+	case TCR_OFFSET:
+	case TTL_OFFSET:
+	case RTL_OFFSET:
+		return 1;
+	}
+
+	return 0;
+}
+
+int serialfc_write_uart_register(struct serialfc_port *port, unsigned offset,
+				 unsigned char value)
+{
+	unsigned long flags;
+	int status;
+
+	return_val_if_untrue(port, -EINVAL);
+
+	if (!serialfc_uart_register_supported(port, offset))
+		return -ENODEV;
+
+	if (serialfc_uart_register_is_read_only(offset))
+		return -EPERM;
+
+	spin_lock_irqsave(&port->register_lock, flags);
+	status = serialfc_set_uart_register(port, offset, value);
+	spin_unlock_irqrestore(&port->register_lock, flags);
+
+	if (status < 0)
+		return status;
+
+	if (offset == UART_EXAR_TXTRG)
+		port->tx_trigger = value;
+	else if (offset == UART_EXAR_RXTRG)
+		port->rx_trigger = value;
+
+	return 0;
+}
+
+int serialfc_read_uart_register(struct serialfc_port *port, unsigned offset,
+				unsigned char *value)
+{
+	unsigned long flags;
+	int status;
+	enum FASTCOM_CARD_TYPE card_type;
+
+	return_val_if_untrue(port, -EINVAL);
+	return_val_if_untrue(value, -EINVAL);
+
+	if (!serialfc_uart_register_supported(port, offset))
+		return -ENODEV;
+
+	card_type = fastcom_get_card_type(port);
+
+	if ((card_type == CARD_TYPE_PCI || card_type == CARD_TYPE_PCIe) &&
+	    (offset == UART_EXAR_TXTRG || offset == UART_EXAR_RXTRG)) {
+		if (offset == UART_EXAR_TXTRG)
+			*value = port->tx_trigger;
+		else
+			*value = port->rx_trigger;
+
+		return 0;
+	}
+
+	spin_lock_irqsave(&port->register_lock, flags);
+	status = serialfc_get_uart_register(port, offset, value);
+	spin_unlock_irqrestore(&port->register_lock, flags);
+
+	return status;
+}
+
+int serialfc_write_icr_register(struct serialfc_port *port, unsigned char index,
+				unsigned char value)
+{
+	unsigned long flags;
+	int status;
+
+	return_val_if_untrue(port, -EINVAL);
+
+	if (!serialfc_icr_register_supported(port))
+		return -ENODEV;
+
+	spin_lock_irqsave(&port->register_lock, flags);
+	status = serialfc_set_icr_register(port, index, value);
+	spin_unlock_irqrestore(&port->register_lock, flags);
+
+	if (status < 0)
+		return status;
+
+	if (index == TTL_OFFSET)
+		port->tx_trigger = value;
+	else if (index == RTL_OFFSET)
+		port->rx_trigger = value;
+	else if (index == TCR_OFFSET && value >= 4 && value <= 16)
+		port->sample_rate = value;
+
+	return 0;
+}
+
+int serialfc_read_icr_register(struct serialfc_port *port, unsigned char index,
+			       unsigned char *value)
+{
+	unsigned long flags;
+	int status;
+
+	return_val_if_untrue(port, -EINVAL);
+	return_val_if_untrue(value, -EINVAL);
+
+	if (!serialfc_icr_register_supported(port))
+		return -ENODEV;
+
+	if (serialfc_icr_register_is_write_only(index)) {
+		if (index == TTL_OFFSET)
+			*value = port->tx_trigger;
+		else if (index == RTL_OFFSET)
+			*value = port->rx_trigger;
+		else if (index == TCR_OFFSET)
+			*value = port->sample_rate;
+
+		return 0;
+	}
+
+	spin_lock_irqsave(&port->register_lock, flags);
+	status = serialfc_get_icr_register(port, index, value);
+	spin_unlock_irqrestore(&port->register_lock, flags);
+
+	return status;
+}
+
+int serialfc_read_bar2_fcr(struct serialfc_port *port, __u32 *value)
+{
+	unsigned long flags;
+
+	return_val_if_untrue(port, -EINVAL);
+	return_val_if_untrue(value, -EINVAL);
+
+	if (!serialfc_bar2_fcr_supported(port))
+		return -ENODEV;
+
+	spin_lock_irqsave(&port->register_lock, flags);
+	*value = ioread32(port->card->bar2);
+	spin_unlock_irqrestore(&port->register_lock, flags);
+
+	return 0;
+}
+
+int serialfc_write_bar2_fcr(struct serialfc_port *port, __u32 value)
+{
+	unsigned long flags;
+
+	return_val_if_untrue(port, -EINVAL);
+
+	if (!serialfc_bar2_fcr_supported(port))
+		return -ENODEV;
+
+	spin_lock_irqsave(&port->register_lock, flags);
+	iowrite32(value, port->card->bar2);
+	spin_unlock_irqrestore(&port->register_lock, flags);
 
 	return 0;
 }

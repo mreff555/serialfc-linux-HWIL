@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/pci.h> /* struct pci_dev */
 #include <linux/module.h>
+#include <linux/version.h>
 
 #include "port.h"
 #include "serialfc.h"
@@ -88,24 +89,10 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
 		return 0;
 	}
 
-	/* The sysfs structures I use in sysfs.c don't work prior to 2.6.25 */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
-
-	if (sysfs_create_group(&port->device->kobj, &port_registers_attr_group)) {
-		dev_err(port->device, "sysfs_create_group (registers)\n");
-		return 0;
-	}
-
-	if (sysfs_create_group(&port->device->kobj, &port_settings_attr_group)) {
-		dev_err(port->device, "sysfs_create_group (settings)\n");
-		return 0;
-	}
-
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25) */
-
 	port->channel = channel;
 	port->card = card;
 	port->addr = addr;
+	spin_lock_init(&port->register_lock);
 	
     fastcom_init_gpio(port);
     fastcom_init_triggers(port);
@@ -132,22 +119,37 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
 	if (fscc_enable_async && fastcom_get_card_type(port) == CARD_TYPE_FSCC)
 		fscc_enable_async_mode(port);
 
+	/* The sysfs structures I use in sysfs.c don't work prior to 2.6.25 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
+
+	if (sysfs_create_group(&port->device->kobj, &port_registers_attr_group)) {
+		dev_err(port->device, "sysfs_create_group (registers)\n");
+		goto err_sysfs;
+	}
+
+	if (sysfs_create_group(&port->device->kobj, &port_settings_attr_group)) {
+		dev_err(port->device, "sysfs_create_group (settings)\n");
+		goto err_sysfs_settings;
+	}
+
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25) */
+
 	cdev_init(&port->cdev, fops);
 	port->cdev.owner = THIS_MODULE;
 
 	if (cdev_add(&port->cdev, port->dev_t, 1) < 0) {
 		dev_err(port->device, "cdev_add failed\n");
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
+		goto err_cdev;
+#else
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 18)
 		device_destroy(port->class, port->dev_t);
 #endif
-
 		if (port->name)
 			kfree(port->name);
-
 		kfree(port);
-
 		return 0;
+#endif
 	}
 
 	if (fastcom_get_card_type(port) == CARD_TYPE_FSCC) {
@@ -160,11 +162,31 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
 	}
 
 	return port;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
+err_cdev:
+	sysfs_remove_group(&port->device->kobj, &port_settings_attr_group);
+err_sysfs_settings:
+	sysfs_remove_group(&port->device->kobj, &port_registers_attr_group);
+err_sysfs:
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 18)
+	device_destroy(port->class, port->dev_t);
+#endif
+	if (port->name)
+		kfree(port->name);
+	kfree(port);
+	return 0;
 }
 
 void serialfc_port_delete(struct serialfc_port *port)
 {
 	return_if_untrue(port);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
+	sysfs_remove_group(&port->device->kobj, &port_settings_attr_group);
+	sysfs_remove_group(&port->device->kobj, &port_registers_attr_group);
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 18)
 	device_destroy(port->class, port->dev_t);

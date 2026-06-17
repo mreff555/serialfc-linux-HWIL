@@ -25,27 +25,6 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
 
-static int uart_register_supported(struct serialfc_port *port, int offset)
-{
-	enum FASTCOM_CARD_TYPE card_type;
-
-	card_type = fastcom_get_card_type(port);
-
-	if (card_type == CARD_TYPE_UNKNOWN)
-		return 0;
-
-	switch (offset) {
-	case UART_EXAR_FCTR:
-	case UART_EXAR_TXTRG:
-	case UART_EXAR_RXTRG:
-	case UART_EXAR_4XMODE:
-	case UART_EXAR_8XMODE:
-		return card_type == CARD_TYPE_PCI || card_type == CARD_TYPE_PCIe;
-	default:
-		return 1;
-	}
-}
-
 static ssize_t uart_register_store(struct kobject *kobj,
 				   struct kobj_attribute *attr, const char *buf,
 				   size_t count)
@@ -54,20 +33,19 @@ static ssize_t uart_register_store(struct kobject *kobj,
 	int offset;
 	unsigned long value;
 	char *end;
+	int status;
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 	offset = str_to_uart_register_offset(attr->attr.name);
 
-	if (offset < 0 || !uart_register_supported(port, offset))
+	if (offset < 0)
 		return -EINVAL;
-
-	if (serialfc_uart_register_is_read_only(offset))
-		return -EPERM;
 
 	value = simple_strtoul(buf, &end, 16);
 
-	if (serialfc_set_uart_register(port, offset, value) < 0)
-		return -EIO;
+	status = serialfc_write_uart_register(port, offset, value);
+	if (status < 0)
+		return status;
 
 	return count;
 }
@@ -78,15 +56,17 @@ static ssize_t uart_register_show(struct kobject *kobj,
 	struct serialfc_port *port;
 	int offset;
 	unsigned char value;
+	int status;
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 	offset = str_to_uart_register_offset(attr->attr.name);
 
-	if (offset < 0 || !uart_register_supported(port, offset))
+	if (offset < 0)
 		return -EINVAL;
 
-	if (serialfc_get_uart_register(port, offset, &value) < 0)
-		return -EIO;
+	status = serialfc_read_uart_register(port, offset, &value);
+	if (status < 0)
+		return status;
 
 	return sprintf(buf, "%02x\n", value);
 }
@@ -99,12 +79,9 @@ static ssize_t icr_register_store(struct kobject *kobj,
 	int index;
 	unsigned long value;
 	char *end;
+	int status;
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
-
-	if (fastcom_get_card_type(port) != CARD_TYPE_FSCC)
-		return -ENODEV;
-
 	index = str_to_icr_register_offset(attr->attr.name);
 
 	if (index < 0)
@@ -112,15 +89,9 @@ static ssize_t icr_register_store(struct kobject *kobj,
 
 	value = simple_strtoul(buf, &end, 16);
 
-	if (serialfc_set_icr_register(port, index, value) < 0)
-		return -EIO;
-
-	if (index == TTL_OFFSET)
-		port->tx_trigger = value;
-	else if (index == RTL_OFFSET)
-		port->rx_trigger = value;
-	else if (index == TCR_OFFSET && value >= 4 && value <= 16)
-		port->sample_rate = value;
+	status = serialfc_write_icr_register(port, index, value);
+	if (status < 0)
+		return status;
 
 	return count;
 }
@@ -131,27 +102,54 @@ static ssize_t icr_register_show(struct kobject *kobj,
 	struct serialfc_port *port;
 	int index;
 	unsigned char value;
+	int status;
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
-
-	if (fastcom_get_card_type(port) != CARD_TYPE_FSCC)
-		return -ENODEV;
-
 	index = str_to_icr_register_offset(attr->attr.name);
 
 	if (index < 0)
 		return -EINVAL;
 
-	if (index == TTL_OFFSET)
-		return sprintf(buf, "%02x\n", (unsigned char)port->tx_trigger);
-
-	if (index == RTL_OFFSET)
-		return sprintf(buf, "%02x\n", (unsigned char)port->rx_trigger);
-
-	if (serialfc_get_icr_register(port, index, &value) < 0)
-		return -EIO;
+	status = serialfc_read_icr_register(port, index, &value);
+	if (status < 0)
+		return status;
 
 	return sprintf(buf, "%02x\n", value);
+}
+
+static ssize_t bar2_fcr_store(struct kobject *kobj,
+			      struct kobj_attribute *attr, const char *buf,
+			      size_t count)
+{
+	struct serialfc_port *port;
+	unsigned long value;
+	char *end;
+	int status;
+
+	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
+	value = simple_strtoul(buf, &end, 16);
+
+	status = serialfc_write_bar2_fcr(port, value);
+	if (status < 0)
+		return status;
+
+	return count;
+}
+
+static ssize_t bar2_fcr_show(struct kobject *kobj,
+			     struct kobj_attribute *attr, char *buf)
+{
+	struct serialfc_port *port;
+	__u32 value;
+	int status;
+
+	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
+
+	status = serialfc_read_bar2_fcr(port, &value);
+	if (status < 0)
+		return status;
+
+	return sprintf(buf, "%08x\n", value);
 }
 
 #define UART_REG_ATTR(_name) \
@@ -197,6 +195,9 @@ ICR_REG_ATTR(ext);
 ICR_REG_ATTR(exth);
 ICR_REG_ATTR(flr);
 
+static struct kobj_attribute bar2_fcr_attribute =
+	__ATTR(bar2_fcr, SYSFS_READ_WRITE_MODE, bar2_fcr_show, bar2_fcr_store);
+
 static struct attribute *register_attrs[] = {
 	&ier_attribute.attr,
 	&fcr_attribute.attr,
@@ -219,6 +220,7 @@ static struct attribute *register_attrs[] = {
 	&ext_attribute.attr,
 	&exth_attribute.attr,
 	&flr_attribute.attr,
+	&bar2_fcr_attribute.attr,
 	NULL,
 };
 

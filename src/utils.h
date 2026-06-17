@@ -111,6 +111,10 @@ __u8 fscc_get_FREV(struct serialfc_port *port);
 __u8 fscc_get_PREV(struct serialfc_port *port);
 __u16 fscc_get_PDEV(struct serialfc_port *port);
 
+int serialfc_uart_register_supported(struct serialfc_port *port, int offset);
+int serialfc_icr_register_supported(struct serialfc_port *port);
+int serialfc_bar2_fcr_supported(struct serialfc_port *port);
+
 int serialfc_set_uart_register(struct serialfc_port *port, unsigned offset,
 			       unsigned char value);
 int serialfc_get_uart_register(struct serialfc_port *port, unsigned offset,
@@ -119,8 +123,21 @@ int serialfc_set_icr_register(struct serialfc_port *port, unsigned char index,
 				unsigned char value);
 int serialfc_get_icr_register(struct serialfc_port *port, unsigned char index,
 			      unsigned char *value);
+
+int serialfc_write_uart_register(struct serialfc_port *port, unsigned offset,
+				 unsigned char value);
+int serialfc_read_uart_register(struct serialfc_port *port, unsigned offset,
+				unsigned char *value);
+int serialfc_write_icr_register(struct serialfc_port *port, unsigned char index,
+				unsigned char value);
+int serialfc_read_icr_register(struct serialfc_port *port, unsigned char index,
+			       unsigned char *value);
+int serialfc_read_bar2_fcr(struct serialfc_port *port, __u32 *value);
+int serialfc_write_bar2_fcr(struct serialfc_port *port, __u32 value);
+
 int str_to_uart_register_offset(const char *name);
 int str_to_icr_register_offset(const char *name);
 int serialfc_uart_register_is_read_only(unsigned offset);
+int serialfc_icr_register_is_write_only(unsigned char index);
 
 #endif
