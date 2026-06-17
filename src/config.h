@@ -20,6 +20,9 @@
 
 #define DEVICE_NAME "serialfc"
 
+/* Maximum number of /dev/serialfcN port nodes supported by one module load. */
+#define SERIALFC_MAX_PORTS 64
+
 #define DEFAULT_RS485 0
 #define DEFAULT_SAMPLE_RATE 16
 #define DEFAULT_TX_TRIGGER_LEVEL 32

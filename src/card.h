@@ -38,7 +38,6 @@ struct serialfc_card {
 };
 
 struct serialfc_card *serialfc_card_new(struct pci_dev *pdev,
-                                        unsigned major_number,
 							            struct class *class,
 							            struct file_operations *fops);
 void serialfc_card_delete(struct serialfc_card *card);

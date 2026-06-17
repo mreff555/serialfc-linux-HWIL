@@ -75,6 +75,9 @@
 
 enum FASTCOM_CARD_TYPE { CARD_TYPE_PCI, CARD_TYPE_PCIe, CARD_TYPE_FSCC, CARD_TYPE_UNKNOWN };
 
+unsigned int serialfc_chrdev_major(void);
+int serialfc_alloc_port_minor(void);
+
 
 #define PCI_29MHZ_BITS 0x100801
 #define FSCC_18MHZ_BITS                                      \

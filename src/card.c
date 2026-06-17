@@ -83,14 +83,13 @@ struct pciserial_board fscc_board = {
 };
 
 struct serialfc_card *serialfc_card_new(struct pci_dev *pdev,
-                                        unsigned major_number,
 							            struct class *class,
 							            struct file_operations *fops)
 {
 	struct serialfc_card *card = 0;
 	struct serialfc_port *port_iter = 0;
 	struct pciserial_board *board = 0;
-	static unsigned minor_number = 0;
+	int minor = 0;
 	unsigned i = 0;
 
 	card = kmalloc(sizeof(*card), GFP_KERNEL);
@@ -202,7 +201,15 @@ struct serialfc_card *serialfc_card_new(struct pci_dev *pdev,
 	}
 
 	for (i = 0; i < board->num_ports; i++) {
-		port_iter = serialfc_port_new(card, i, major_number, minor_number,
+		minor = serialfc_alloc_port_minor();
+		if (minor < 0) {
+			dev_err(&card->pci_dev->dev,
+				"no char device minors available\n");
+			goto err;
+		}
+
+		port_iter = serialfc_port_new(card, i,
+		                        MKDEV(serialfc_chrdev_major(), minor),
 		                        card->addr + (board->uart_offset * i),
 		                        &card->pci_dev->dev, class, fops);
 
@@ -212,7 +219,6 @@ struct serialfc_card *serialfc_card_new(struct pci_dev *pdev,
 		}
 
 		list_add_tail(&port_iter->list, &card->ports);
-		minor_number += 1;
 	}
 
 	return card;

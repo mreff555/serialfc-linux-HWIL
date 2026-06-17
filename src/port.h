@@ -49,8 +49,7 @@ struct serialfc_port {
 
 struct serialfc_port *serialfc_port_new(struct serialfc_card *card,
                                         unsigned channel,
-                                        unsigned major_number,
-                                        unsigned minor_number,
+                                        dev_t dev,
                                         void __iomem *addr,
                                         struct device *parent,
                                         struct class *class,

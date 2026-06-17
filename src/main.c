@@ -30,8 +30,22 @@
 #include "utils.h"
 
 
-static int serialfc_major_number;
+static dev_t serialfc_devt;
+static unsigned serialfc_next_minor;
 static struct class *serialfc_class = 0;
+
+unsigned int serialfc_chrdev_major(void)
+{
+	return MAJOR(serialfc_devt);
+}
+
+int serialfc_alloc_port_minor(void)
+{
+	if (serialfc_next_minor >= SERIALFC_MAX_PORTS)
+		return -EBUSY;
+
+	return (int)serialfc_next_minor++;
+}
 
 unsigned fscc_enable_async = DEFAULT_FSCC_ASYNC_MODE;
 
@@ -344,8 +358,7 @@ static int fc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (pci_enable_device(pdev))
 		return -EIO;
 
-	new_card = serialfc_card_new(pdev, serialfc_major_number, serialfc_class,
-						         &serialfc_fops);
+	new_card = serialfc_card_new(pdev, serialfc_class, &serialfc_fops);
 
 	if (!new_card) {
 		pci_disable_device(pdev);
@@ -394,10 +407,11 @@ static int __init serialfc_init(void)
 		return PTR_ERR(serialfc_class);
 	}
 
-	serialfc_major_number = error_code = register_chrdev(0, "serialfc", &serialfc_fops);
+	error_code = alloc_chrdev_region(&serialfc_devt, 0, SERIALFC_MAX_PORTS,
+					 DEVICE_NAME);
 
-	if (serialfc_major_number < 0) {
-		printk(KERN_ERR DEVICE_NAME " register_chrdev failed\n");
+	if (error_code < 0) {
+		printk(KERN_ERR DEVICE_NAME " alloc_chrdev_region failed\n");
 		class_destroy(serialfc_class);
 		return error_code;
 	}
@@ -406,14 +420,14 @@ static int __init serialfc_init(void)
 
 	if (error_code < 0) {
 		printk(KERN_ERR DEVICE_NAME " pci_register_driver failed");
-		unregister_chrdev(serialfc_major_number, "serialfc");
+		unregister_chrdev_region(serialfc_devt, SERIALFC_MAX_PORTS);
 		class_destroy(serialfc_class);
 		return error_code;
 	}
 
 	if (list_empty(&serialfc_cards)) {
 		pci_unregister_driver(&serialfc_pci_driver);
-		unregister_chrdev(serialfc_major_number, "serialfc");
+		unregister_chrdev_region(serialfc_devt, SERIALFC_MAX_PORTS);
 		class_destroy(serialfc_class);
 		return -ENODEV;
 	}
@@ -436,7 +450,7 @@ static void __exit serialfc_exit(void)
 	}
 
 	pci_unregister_driver(&serialfc_pci_driver);
-	unregister_chrdev(serialfc_major_number, DEVICE_NAME);
+	unregister_chrdev_region(serialfc_devt, SERIALFC_MAX_PORTS);
 	class_destroy(serialfc_class);
 }
 

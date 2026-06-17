@@ -32,8 +32,8 @@
 extern unsigned fscc_enable_async;
 
 struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned channel,
-							unsigned major_number, unsigned minor_number,
-                            void __iomem *addr, struct device *parent, struct class *class,
+							dev_t dev, void __iomem *addr,
+							struct device *parent, struct class *class,
 							struct file_operations *fops)
 {
 	struct serialfc_port *port = 0;
@@ -53,10 +53,10 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
 		return 0;
 	}
 
-	sprintf(port->name, "%s%u", DEVICE_NAME, minor_number);
+	sprintf(port->name, "%s%u", DEVICE_NAME, MINOR(dev));
 
 	port->class = class;
-	port->dev_t = MKDEV(major_number, minor_number);
+	port->dev_t = dev;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 18)
 
