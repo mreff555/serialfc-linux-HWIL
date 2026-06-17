@@ -27,7 +27,6 @@
 #include "card.h"
 #include "utils.h"
 #include "serialfc.h"
-#include "utils.h"
 
 
 static dev_t serialfc_devt;

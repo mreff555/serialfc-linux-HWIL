@@ -22,6 +22,7 @@
 #include <linux/pci.h> /* struct pci_dev */
 #include <linux/module.h>
 #include <linux/version.h>
+#include <linux/err.h>
 
 #include "port.h"
 #include "serialfc.h"
@@ -75,17 +76,13 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
 						port->name);
 #endif
 
-	if (port->device <= 0) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 18)
-		device_destroy(port->class, port->dev_t);
-#endif
+	if (!port->device || IS_ERR(port->device)) {
+		dev_err(parent, "%s: device_create failed\n", port->name);
 
 		if (port->name)
 			kfree(port->name);
 
 		kfree(port);
-
-		printk(KERN_ERR DEVICE_NAME " %s: device_create failed\n", port->name);
 		return 0;
 	}
 

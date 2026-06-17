@@ -1445,6 +1445,9 @@ void fastcom_get_echo_cancel(struct serialfc_port *port, int *enabled)
 #define DTA_BASE 0x00000001
 #define CLK_BASE 0x00000002
 
+/* 20 clock bytes, 8 bits each, 3 BAR2 writes per bit, plus preamble/epilogue */
+#define FSCC_CLOCK_BITS_DATA_COUNT (1 + (20 * 8 * 3) + 2)
+
 int fastcom_set_clock_bits_fscc(struct serialfc_port *port,
 							    unsigned char *clock_data)
 {
@@ -1456,7 +1459,7 @@ int fastcom_set_clock_bits_fscc(struct serialfc_port *port,
 	unsigned dta_value = DTA_BASE;
 	unsigned clk_value = CLK_BASE;
 
-	__u32 data[323];
+	__u32 data[FSCC_CLOCK_BITS_DATA_COUNT];
 	unsigned data_index = 0;
 
 
@@ -1500,8 +1503,10 @@ int fastcom_set_clock_bits_fscc(struct serialfc_port *port,
 			else
 				new_fcr_value &= ~dta_value; /* Clear clock bit */
 
-			data[data_index++] = new_fcr_value |= clk_value; /* Set clock bit */
-			data[data_index++] = new_fcr_value &= ~clk_value; /* Clear clock bit */
+			new_fcr_value |= clk_value; /* Set clock bit */
+			data[data_index++] = new_fcr_value;
+			new_fcr_value &= ~clk_value; /* Clear clock bit */
+			data[data_index++] = new_fcr_value;
 
 			new_fcr_value = orig_fcr_value & 0xfffff0f0;
 		}
