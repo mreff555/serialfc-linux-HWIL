@@ -139,5 +139,9 @@ int str_to_uart_register_offset(const char *name);
 int str_to_icr_register_offset(const char *name);
 int serialfc_uart_register_is_read_only(unsigned offset);
 int serialfc_icr_register_is_write_only(unsigned char index);
+int serialfc_validate_uart_register_write(struct serialfc_port *port,
+					  unsigned offset, unsigned char value);
+void serialfc_warn_register_access(struct serialfc_port *port);
+void serialfc_warn_bar2_fcr_access(struct serialfc_port *port);
 
 #endif

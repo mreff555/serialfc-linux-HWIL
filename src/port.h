@@ -44,6 +44,7 @@ struct serialfc_port {
 	unsigned tx_trigger;
 	unsigned rx_trigger;
 	spinlock_t register_lock;
+	unsigned register_access_warned;
 };
 
 struct serialfc_port *serialfc_port_new(struct serialfc_card *card,

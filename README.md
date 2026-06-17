@@ -234,6 +234,7 @@ There are likely other configuration options you will need to set up for your
 own program. All of these options are described on their respective documentation page.
 
 - [Baud Rate](docs/baud-rate.md)
+- [Registers](docs/registers.md)
 - [Connect](docs/connect.md)
 - [Card Type](docs/card-type.md)
 - [Clock Rate](docs/clock-rate.md)

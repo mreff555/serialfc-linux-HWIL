@@ -296,10 +296,51 @@ int serialfc_uart_register_is_read_only(unsigned offset)
 	switch (offset) {
 	case LSR_OFFSET:
 	case MSR_OFFSET:
+	case SPR_OFFSET:
 		return 1;
 	}
 
 	return 0;
+}
+
+int serialfc_validate_uart_register_write(struct serialfc_port *port,
+					  unsigned offset, unsigned char value)
+{
+	return_val_if_untrue(port, -EINVAL);
+
+	if (offset == LCR_OFFSET && value == 0xbf) {
+		dev_err(port->device,
+			"Refusing LCR write 0xbf: enhanced 650 register mode is "
+			"managed internally. Use registers/acr, registers/tcr, "
+			"etc. for 16C950 ICR access instead.\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+void serialfc_warn_register_access(struct serialfc_port *port)
+{
+	return_if_untrue(port);
+
+	if (!port->register_access_warned) {
+		dev_warn(port->device,
+			 "Sysfs register access can race with the kernel ttyS "
+			 "driver on the same UART. Close all /dev/ttyS* "
+			 "handles on this port before writing registers, or "
+			 "prefer /sys/.../settings/ for high-level options.\n");
+		port->register_access_warned = 1;
+	}
+}
+
+void serialfc_warn_bar2_fcr_access(struct serialfc_port *port)
+{
+	return_if_untrue(port);
+
+	dev_warn_once(port->device,
+		      "bar2_fcr is shared across both ports on this FSCC card "
+		      "(BAR2 FCR). For async mode use bit 24/25 per channel; "
+		      "the UART registers/fcr file is a different register.\n");
 }
 
 int serialfc_icr_register_is_write_only(unsigned char index)
@@ -327,6 +368,19 @@ int serialfc_write_uart_register(struct serialfc_port *port, unsigned offset,
 
 	if (serialfc_uart_register_is_read_only(offset))
 		return -EPERM;
+
+	status = serialfc_validate_uart_register_write(port, offset, value);
+	if (status < 0)
+		return status;
+
+	serialfc_warn_register_access(port);
+
+	if (offset == FCR_OFFSET &&
+	    fastcom_get_card_type(port) == CARD_TYPE_FSCC)
+		dev_warn_once(port->device,
+			      "On FSCC cards, registers/fcr is the UART FIFO "
+			      "control register. Use registers/bar2_fcr for "
+			      "card-level async mode (see docs/registers.md).\n");
 
 	spin_lock_irqsave(&port->register_lock, flags);
 	status = serialfc_set_uart_register(port, offset, value);
@@ -385,6 +439,8 @@ int serialfc_write_icr_register(struct serialfc_port *port, unsigned char index,
 
 	if (!serialfc_icr_register_supported(port))
 		return -ENODEV;
+
+	serialfc_warn_register_access(port);
 
 	spin_lock_irqsave(&port->register_lock, flags);
 	status = serialfc_set_icr_register(port, index, value);
@@ -458,6 +514,9 @@ int serialfc_write_bar2_fcr(struct serialfc_port *port, __u32 value)
 
 	if (!serialfc_bar2_fcr_supported(port))
 		return -ENODEV;
+
+	serialfc_warn_register_access(port);
+	serialfc_warn_bar2_fcr_access(port);
 
 	spin_lock_irqsave(&port->register_lock, flags);
 	iowrite32(value, port->card->bar2);
