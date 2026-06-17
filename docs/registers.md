@@ -117,9 +117,10 @@ See the table above. Async mode for FSCC cards is controlled through
 
 ### 4. Permissions
 
-Register files use mode **0660** (`SYSFS_READ_WRITE_MODE`). Root and members
-of the device node's group can read/write. Add users to the `dialout` group for
-tty access; sysfs permissions follow the `serialfc` device class defaults.
+Character device nodes are created with udev rule `GROUP="dialout"`,
+`MODE="0660"` (see `serialfc.rules`). Register sysfs files also use mode
+**0660** (`SYSFS_READ_WRITE_MODE`). Root and members of the device node's group
+can read/write. Add users to the `dialout` group for tty and sysfs access.
 
 ### 5. When to use `settings/` instead
 

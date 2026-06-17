@@ -92,7 +92,7 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
 	port->channel = channel;
 	port->card = card;
 	port->addr = addr;
-	spin_lock_init(&port->register_lock);
+	mutex_init(&port->config_mutex);
 	port->register_access_warned = 0;
 	
     fastcom_init_gpio(port);

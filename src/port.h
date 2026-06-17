@@ -23,7 +23,7 @@
 
 #include <linux/list.h>
 #include <linux/cdev.h> /* struct cdev */
-#include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <linux/version.h> /* LINUX_VERSION_CODE, KERNEL_VERSION */
 
 #include "card.h"
@@ -43,7 +43,7 @@ struct serialfc_port {
 	unsigned char ACR;
 	unsigned tx_trigger;
 	unsigned rx_trigger;
-	spinlock_t register_lock;
+	struct mutex config_mutex;
 	unsigned register_access_warned;
 };
 

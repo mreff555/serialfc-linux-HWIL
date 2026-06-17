@@ -145,14 +145,23 @@ struct serialfc_card *serialfc_card_new(struct pci_dev *pdev,
 		break;
 	}
 
+	if (!board) {
+		dev_err(&card->pci_dev->dev, "unsupported device 0x%x\n",
+			pdev->device);
+		kfree(card);
+		return 0;
+	}
+
 	card->serial_priv = 0;
+	card->bar0 = 0;
+	card->bar2 = 0;
 
 	if (fastcom_get_card_type2(card) == CARD_TYPE_FSCC) {
 	    card->serial_priv = pciserial_init_ports(pdev, board);
 
 	    if (IS_ERR(card->serial_priv)) {
 		    dev_err(&card->pci_dev->dev, "pciserial_init_ports failed\n");
-		    return 0;
+		    goto err;
 	    }
 	}
 	else {
@@ -161,7 +170,7 @@ struct serialfc_card *serialfc_card_new(struct pci_dev *pdev,
 
 	    if (IS_ERR(card->serial_priv)) {
 		    dev_err(&card->pci_dev->dev, "pciserial_init_ports failed\n");
-		    return 0;
+		    goto err;
 	    }
 #endif
     }
@@ -173,38 +182,44 @@ struct serialfc_card *serialfc_card_new(struct pci_dev *pdev,
 
 	if (card->addr == NULL) {
 		dev_err(&card->pci_dev->dev, "pci_iomap failed\n");
-		return 0;
+		goto err;
 	}
 
 	if (fastcom_get_card_type2(card) == CARD_TYPE_FSCC) {
 	    card->bar0 = pci_iomap(card->pci_dev, 0, 0);
 
 	    if (card->bar0 == NULL) {
-		    dev_err(&card->pci_dev->dev, "pci_iomap failed\n");
-		    return 0;
+		    dev_err(&card->pci_dev->dev, "pci_iomap bar0 failed\n");
+		    goto err;
 	    }
 
 	    card->bar2 = pci_iomap(card->pci_dev, 2, 0);
 
 	    if (card->bar2 == NULL) {
-		    dev_err(&card->pci_dev->dev, "pci_iomap failed\n");
-		    return 0;
+		    dev_err(&card->pci_dev->dev, "pci_iomap bar2 failed\n");
+		    goto err;
 	    }
 	}
 
-	/* There are two ports per card. */
 	for (i = 0; i < board->num_ports; i++) {
 		port_iter = serialfc_port_new(card, i, major_number, minor_number,
 		                        card->addr + (board->uart_offset * i),
 		                        &card->pci_dev->dev, class, fops);
 
-		if (port_iter)
-			list_add_tail(&port_iter->list, &card->ports);
+		if (!port_iter) {
+			dev_err(&card->pci_dev->dev, "serialfc_port_new failed\n");
+			goto err;
+		}
 
+		list_add_tail(&port_iter->list, &card->ports);
 		minor_number += 1;
 	}
 
 	return card;
+
+err:
+	serialfc_card_delete(card);
+	return 0;
 }
 
 void serialfc_card_delete(struct serialfc_card *card)
@@ -225,6 +240,15 @@ void serialfc_card_delete(struct serialfc_card *card)
 
 	if (card->serial_priv)
 	    pciserial_remove_ports(card->serial_priv);
+
+	if (card->addr)
+		pci_iounmap(card->pci_dev, card->addr);
+
+	if (card->bar0)
+		pci_iounmap(card->pci_dev, card->bar0);
+
+	if (card->bar2)
+		pci_iounmap(card->pci_dev, card->bar2);
 
 	kfree(card);
 }

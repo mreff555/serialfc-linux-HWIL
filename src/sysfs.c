@@ -241,7 +241,9 @@ static ssize_t nine_bit_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_9bit(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -254,7 +256,9 @@ static ssize_t nine_bit_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_9bit(port, &enabled);
+	serialfc_port_config_lock(port);
+	fastcom_get_9bit(port, &enabled);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", enabled);
 }
@@ -271,7 +275,9 @@ static ssize_t echo_cancel_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_echo_cancel(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -284,7 +290,9 @@ static ssize_t echo_cancel_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_echo_cancel(port, &enabled);
+	serialfc_port_config_lock(port);
+	fastcom_get_echo_cancel(port, &enabled);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", enabled);
 }
@@ -301,7 +309,9 @@ static ssize_t external_transmit_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_external_transmit(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -314,7 +324,9 @@ static ssize_t external_transmit_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_external_transmit(port, &value);
+	serialfc_port_config_lock(port);
+	fastcom_get_external_transmit(port, &value);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", value);
 }
@@ -331,7 +343,9 @@ static ssize_t frame_length_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_frame_length(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -344,7 +358,9 @@ static ssize_t frame_length_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_frame_length(port, &value);
+	serialfc_port_config_lock(port);
+	fastcom_get_frame_length(port, &value);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", value);
 }
@@ -361,7 +377,9 @@ static ssize_t isochronous_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_isochronous(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -374,7 +392,9 @@ static ssize_t isochronous_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_isochronous(port, &value);
+	serialfc_port_config_lock(port);
+	fastcom_get_isochronous(port, &value);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", value);
 }
@@ -391,7 +411,9 @@ static ssize_t rs485_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_rs485(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -404,7 +426,9 @@ static ssize_t rs485_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_rs485(port, &enabled);
+	serialfc_port_config_lock(port);
+	fastcom_get_rs485(port, &enabled);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", enabled);
 }
@@ -421,7 +445,9 @@ static ssize_t rx_trigger_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_rx_trigger(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -434,7 +460,9 @@ static ssize_t rx_trigger_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_rx_trigger(port, &value);
+	serialfc_port_config_lock(port);
+	fastcom_get_rx_trigger(port, &value);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", value);
 }
@@ -451,7 +479,9 @@ static ssize_t sample_rate_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_sample_rate(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -464,7 +494,9 @@ static ssize_t sample_rate_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_sample_rate(port, &value);
+	serialfc_port_config_lock(port);
+	fastcom_get_sample_rate(port, &value);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", value);
 }
@@ -481,7 +513,9 @@ static ssize_t tx_trigger_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_tx_trigger(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -494,7 +528,9 @@ static ssize_t termination_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_termination(port, &value);
+	serialfc_port_config_lock(port);
+	fastcom_get_termination(port, &value);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", value);
 }
@@ -511,7 +547,9 @@ static ssize_t termination_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_termination(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -524,7 +562,9 @@ static ssize_t tx_trigger_show(struct kobject *kobj,
 
 	port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
-    fastcom_get_tx_trigger(port, &value);
+	serialfc_port_config_lock(port);
+	fastcom_get_tx_trigger(port, &value);
+	serialfc_port_config_unlock(port);
 
 	return sprintf(buf, "%i\n", value);
 }
@@ -541,7 +581,9 @@ static ssize_t clock_rate_store(struct kobject *kobj,
 
 	value = (unsigned)simple_strtoul(buf, &end, 16);
 
+	serialfc_port_config_lock(port);
 	fastcom_set_clock_rate(port, value);
+	serialfc_port_config_unlock(port);
 
 	return count;
 }
@@ -554,7 +596,9 @@ static ssize_t baud_rate_show(struct kobject *kobj,
 
    port = (struct serialfc_port *)dev_get_drvdata((struct device *)kobj);
 
+   serialfc_port_config_lock(port);
    fastcom_get_baud_rate(port, &value);
+   serialfc_port_config_unlock(port);
 
    return sprintf(buf, "%lu\n", value);
 }
@@ -571,7 +615,9 @@ static ssize_t baud_rate_store(struct kobject *kobj,
 
    value = simple_strtoul(buf, &end, 10);
 
+   serialfc_port_config_lock(port);
    fastcom_set_baud_rate(port, value);
+   serialfc_port_config_unlock(port);
 
    return count;
 }

@@ -85,6 +85,18 @@ int serialfc_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static int serialfc_ioctl_copy_to_user(struct serialfc_port *port,
+				       void __user *dst, const void *src,
+				       size_t len)
+{
+	if (copy_to_user(dst, src, len)) {
+		dev_dbg(port->device, "copy_to_user failed\n");
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 long serialfc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #else
@@ -98,11 +110,15 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	int error_code = 0;
 	char clock_bits[20];
 	unsigned int tmp=0;
-	long unsigned int baud_rate=0;
+	unsigned long baud_rate=0;
 	unsigned int clock_rate=0;
-	int copy_success = 0;
 
 	port = file->private_data;
+
+	if (!port)
+		return -ENODEV;
+
+	serialfc_port_config_lock(port);
 
 	switch (cmd) {
 	case IOCTL_FASTCOM_ENABLE_RS485:
@@ -115,8 +131,9 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_RS485:
 		error_code = fastcom_get_rs485(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_RS485 copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_ENABLE_ECHO_CANCEL:
@@ -129,8 +146,8 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_ECHO_CANCEL:
 		fastcom_get_echo_cancel(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_ECHO_CANCEL copy_to_user() failed with %d\n", copy_success);
+		error_code = serialfc_ioctl_copy_to_user(port,
+				(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_ENABLE_TERMINATION:
@@ -143,8 +160,9 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_TERMINATION:
 		error_code = fastcom_get_termination(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_TERMINATION copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_SET_SAMPLE_RATE:
@@ -154,8 +172,8 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_SAMPLE_RATE:
 		fastcom_get_sample_rate(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_SAMPLE_RATE copy_to_user() failed with %d\n", copy_success);
+		error_code = serialfc_ioctl_copy_to_user(port,
+				(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_SET_TX_TRIGGER:
@@ -165,8 +183,9 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_TX_TRIGGER:
 		error_code = fastcom_get_tx_trigger(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_TX_TRIGGER copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_SET_RX_TRIGGER:
@@ -176,8 +195,9 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_RX_TRIGGER:
 		error_code = fastcom_get_rx_trigger(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_RX_TRIGGER copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_SET_CLOCK_RATE:
@@ -186,8 +206,11 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		break;
 
 	case IOCTL_FASTCOM_SET_CLOCK_BITS:
-		copy_success = copy_from_user(clock_bits, (char *)arg, 20);
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_SET_CLOCK_BITS copy_from_user() failed with %d\n", copy_success);
+		if (copy_from_user(clock_bits, (char __user *)arg,
+				    sizeof(clock_bits))) {
+			error_code = -EFAULT;
+			break;
+		}
 		error_code = fastcom_set_clock_bits(port, clock_bits);
 		break;
 
@@ -201,8 +224,9 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_ISOCHRONOUS:
 		error_code = fastcom_get_isochronous(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_ISOCHRONOUS copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_ENABLE_EXTERNAL_TRANSMIT:
@@ -215,8 +239,9 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_EXTERNAL_TRANSMIT:
 		error_code = fastcom_get_external_transmit(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_EXTERNAL_TRANSMIT copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_SET_FRAME_LENGTH:
@@ -226,14 +251,15 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_FRAME_LENGTH:
 		error_code = fastcom_get_frame_length(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_FRAME_LENGTH copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_GET_CARD_TYPE:
 		tmp = fastcom_get_card_type(port);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_CARD_TYPE copy_to_user() failed with %d\n", copy_success);
+		error_code = serialfc_ioctl_copy_to_user(port,
+				(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_ENABLE_9BIT:
@@ -246,8 +272,9 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_9BIT:
 		error_code = fastcom_get_9bit(port, &tmp);
-		copy_success = copy_to_user((unsigned *)arg, &tmp, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_9BIT copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &tmp, sizeof(tmp));
 		break;
 
 	case IOCTL_FASTCOM_SET_BAUD_RATE:
@@ -257,8 +284,10 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case IOCTL_FASTCOM_GET_BAUD_RATE:
 		error_code = fastcom_get_baud_rate(port, &baud_rate);
-		copy_success = copy_to_user((unsigned *)arg, &baud_rate, sizeof(tmp));
-		if(copy_success) dev_dbg(port->device, "IOCTL_FASTCOM_GET_BAUD_RATE copy_to_user() failed with %d\n", copy_success);
+		if (error_code == 0)
+			error_code = serialfc_ioctl_copy_to_user(port,
+					(void __user *)arg, &baud_rate,
+					sizeof(baud_rate));
 		break;
 
 	case IOCTL_FASTCOM_ENABLE_FIXED_BAUD_RATE:
@@ -278,16 +307,18 @@ int serialfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
             else
                 l_dev_data.slot = port->card->pci_dev->slot->number;
 
-            if (copy_to_user((void *)arg, &l_dev_data, sizeof(l_dev_data))) {
-	            error_code = -ENODATA; // Report error
-                printk(KERN_ERR DEVICE_NAME " ioctl get-dev-info failed copy_to_user\n");
-            }
+            error_code = serialfc_ioctl_copy_to_user(port,
+                    (void __user *)arg, &l_dev_data,
+                    sizeof(l_dev_data));
             break;
 
 	default:
 		dev_dbg(port->device, "unknown ioctl 0x%x\n", cmd);
-		return -ENOTTY;
+		error_code = -ENOTTY;
+		break;
 	}
+
+	serialfc_port_config_unlock(port);
 
 	return error_code;
 }
@@ -307,14 +338,21 @@ static int fc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct serialfc_card *new_card = 0;
 
+	if (serialfc_card_find(pdev, &serialfc_cards))
+		return 0;
+
 	if (pci_enable_device(pdev))
 		return -EIO;
 
 	new_card = serialfc_card_new(pdev, serialfc_major_number, serialfc_class,
 						         &serialfc_fops);
 
-	if (new_card)
-		list_add_tail(&new_card->list, &serialfc_cards);
+	if (!new_card) {
+		pci_disable_device(pdev);
+		return -ENODEV;
+	}
+
+	list_add_tail(&new_card->list, &serialfc_cards);
 
 	return 0;
 }
@@ -373,36 +411,11 @@ static int __init serialfc_init(void)
 		return error_code;
 	}
 
-	if (error_code == 0) {
-		struct pci_dev *pdev = NULL;
-        unsigned num_devices = 0;
-        struct serialfc_card *new_card = 0;
-
-		pdev = pci_get_device(COMMTECH_VENDOR_ID, PCI_ANY_ID, pdev);
-
-		while (pdev != NULL) {
-			if (is_serialfc_device(pdev)) {
-				++num_devices;
-
-			    if (pci_enable_device(pdev))
-				    return -EIO;
-
-			    new_card = serialfc_card_new(pdev, serialfc_major_number,
-			                                 serialfc_class, &serialfc_fops);
-
-			    if (new_card)
-				    list_add_tail(&new_card->list, &serialfc_cards);
-	        }
-
-			pdev = pci_get_device(COMMTECH_VENDOR_ID, PCI_ANY_ID, pdev);
-		}
-
-		if (num_devices == 0) {
-			pci_unregister_driver(&serialfc_pci_driver);
-		    unregister_chrdev(serialfc_major_number, "serialfc");
-		    class_destroy(serialfc_class);
-			return -ENODEV;
-		}
+	if (list_empty(&serialfc_cards)) {
+		pci_unregister_driver(&serialfc_pci_driver);
+		unregister_chrdev(serialfc_major_number, "serialfc");
+		class_destroy(serialfc_class);
+		return -ENODEV;
 	}
 
 	return 0;

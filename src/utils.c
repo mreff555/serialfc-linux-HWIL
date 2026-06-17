@@ -343,6 +343,20 @@ void serialfc_warn_bar2_fcr_access(struct serialfc_port *port)
 		      "the UART registers/fcr file is a different register.\n");
 }
 
+void serialfc_port_config_lock(struct serialfc_port *port)
+{
+	return_if_untrue(port);
+
+	mutex_lock(&port->config_mutex);
+}
+
+void serialfc_port_config_unlock(struct serialfc_port *port)
+{
+	return_if_untrue(port);
+
+	mutex_unlock(&port->config_mutex);
+}
+
 int serialfc_icr_register_is_write_only(unsigned char index)
 {
 	switch (index) {
@@ -358,7 +372,6 @@ int serialfc_icr_register_is_write_only(unsigned char index)
 int serialfc_write_uart_register(struct serialfc_port *port, unsigned offset,
 				 unsigned char value)
 {
-	unsigned long flags;
 	int status;
 
 	return_val_if_untrue(port, -EINVAL);
@@ -382,9 +395,9 @@ int serialfc_write_uart_register(struct serialfc_port *port, unsigned offset,
 			      "control register. Use registers/bar2_fcr for "
 			      "card-level async mode (see docs/registers.md).\n");
 
-	spin_lock_irqsave(&port->register_lock, flags);
+	serialfc_port_config_lock(port);
 	status = serialfc_set_uart_register(port, offset, value);
-	spin_unlock_irqrestore(&port->register_lock, flags);
+	serialfc_port_config_unlock(port);
 
 	if (status < 0)
 		return status;
@@ -400,7 +413,6 @@ int serialfc_write_uart_register(struct serialfc_port *port, unsigned offset,
 int serialfc_read_uart_register(struct serialfc_port *port, unsigned offset,
 				unsigned char *value)
 {
-	unsigned long flags;
 	int status;
 	enum FASTCOM_CARD_TYPE card_type;
 
@@ -422,9 +434,9 @@ int serialfc_read_uart_register(struct serialfc_port *port, unsigned offset,
 		return 0;
 	}
 
-	spin_lock_irqsave(&port->register_lock, flags);
+	serialfc_port_config_lock(port);
 	status = serialfc_get_uart_register(port, offset, value);
-	spin_unlock_irqrestore(&port->register_lock, flags);
+	serialfc_port_config_unlock(port);
 
 	return status;
 }
@@ -432,7 +444,6 @@ int serialfc_read_uart_register(struct serialfc_port *port, unsigned offset,
 int serialfc_write_icr_register(struct serialfc_port *port, unsigned char index,
 				unsigned char value)
 {
-	unsigned long flags;
 	int status;
 
 	return_val_if_untrue(port, -EINVAL);
@@ -442,9 +453,9 @@ int serialfc_write_icr_register(struct serialfc_port *port, unsigned char index,
 
 	serialfc_warn_register_access(port);
 
-	spin_lock_irqsave(&port->register_lock, flags);
+	serialfc_port_config_lock(port);
 	status = serialfc_set_icr_register(port, index, value);
-	spin_unlock_irqrestore(&port->register_lock, flags);
+	serialfc_port_config_unlock(port);
 
 	if (status < 0)
 		return status;
@@ -462,7 +473,6 @@ int serialfc_write_icr_register(struct serialfc_port *port, unsigned char index,
 int serialfc_read_icr_register(struct serialfc_port *port, unsigned char index,
 			       unsigned char *value)
 {
-	unsigned long flags;
 	int status;
 
 	return_val_if_untrue(port, -EINVAL);
@@ -482,16 +492,15 @@ int serialfc_read_icr_register(struct serialfc_port *port, unsigned char index,
 		return 0;
 	}
 
-	spin_lock_irqsave(&port->register_lock, flags);
+	serialfc_port_config_lock(port);
 	status = serialfc_get_icr_register(port, index, value);
-	spin_unlock_irqrestore(&port->register_lock, flags);
+	serialfc_port_config_unlock(port);
 
 	return status;
 }
 
 int serialfc_read_bar2_fcr(struct serialfc_port *port, __u32 *value)
 {
-	unsigned long flags;
 
 	return_val_if_untrue(port, -EINVAL);
 	return_val_if_untrue(value, -EINVAL);
@@ -499,16 +508,15 @@ int serialfc_read_bar2_fcr(struct serialfc_port *port, __u32 *value)
 	if (!serialfc_bar2_fcr_supported(port))
 		return -ENODEV;
 
-	spin_lock_irqsave(&port->register_lock, flags);
+	serialfc_port_config_lock(port);
 	*value = ioread32(port->card->bar2);
-	spin_unlock_irqrestore(&port->register_lock, flags);
+	serialfc_port_config_unlock(port);
 
 	return 0;
 }
 
 int serialfc_write_bar2_fcr(struct serialfc_port *port, __u32 value)
 {
-	unsigned long flags;
 
 	return_val_if_untrue(port, -EINVAL);
 
@@ -518,9 +526,9 @@ int serialfc_write_bar2_fcr(struct serialfc_port *port, __u32 value)
 	serialfc_warn_register_access(port);
 	serialfc_warn_bar2_fcr_access(port);
 
-	spin_lock_irqsave(&port->register_lock, flags);
+	serialfc_port_config_lock(port);
 	iowrite32(value, port->card->bar2);
-	spin_unlock_irqrestore(&port->register_lock, flags);
+	serialfc_port_config_unlock(port);
 
 	return 0;
 }
@@ -1448,7 +1456,7 @@ int fastcom_set_clock_bits_fscc(struct serialfc_port *port,
 	unsigned dta_value = DTA_BASE;
 	unsigned clk_value = CLK_BASE;
 
-	__u32 *data = 0;
+	__u32 data[323];
 	unsigned data_index = 0;
 
 
@@ -1468,13 +1476,6 @@ int fastcom_set_clock_bits_fscc(struct serialfc_port *port,
     }
 #endif
 
-
-	data = kmalloc(sizeof(__u32) * 323, GFP_KERNEL);
-
-	if (data == NULL) {
-		printk(KERN_ERR DEVICE_NAME "kmalloc failed\n");
-		return 1;
-	}
 
 	if (port->channel == 1) {
 		strb_value <<= 0x08;
@@ -1515,8 +1516,6 @@ int fastcom_set_clock_bits_fscc(struct serialfc_port *port,
 	data[data_index++] = orig_fcr_value;
 
 	iowrite32_rep(port->card->bar2, data, data_index);
-
-	kfree(data);
 
     return 0;
 }

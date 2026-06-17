@@ -27,4 +27,4 @@
 #Put the serialfc.rules file in the /etc/udev/rules.d directory before loading
 #the driver.
 
-SUBSYSTEM=="serialfc*", MODE="0666"
+SUBSYSTEM=="serialfc*", GROUP="dialout", MODE="0660"
