@@ -111,4 +111,15 @@ __u8 fscc_get_FREV(struct serialfc_port *port);
 __u8 fscc_get_PREV(struct serialfc_port *port);
 __u16 fscc_get_PDEV(struct serialfc_port *port);
 
+int serialfc_set_uart_register(struct serialfc_port *port, unsigned offset,
+			       unsigned char value);
+int serialfc_get_uart_register(struct serialfc_port *port, unsigned offset,
+			       unsigned char *value);
+int serialfc_set_icr_register(struct serialfc_port *port, unsigned char index,
+				unsigned char value);
+int serialfc_get_icr_register(struct serialfc_port *port, unsigned char index,
+			      unsigned char *value);
+int str_to_uart_register_offset(const char *name);
+int str_to_icr_register_offset(const char *name);
+
 #endif

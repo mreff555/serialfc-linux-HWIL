@@ -18,10 +18,16 @@
 
 */
 
+#include <linux/string.h>
+
 #include "utils.h"
 #include "serialfc.h"
 #include "port.h"
 #include "config.h"
+
+#define IER_OFFSET 0x1
+#define LSR_OFFSET 0x5
+#define MSR_OFFSET 0x6
 
 int fastcom_set_sample_rate_pci(struct serialfc_port *port, unsigned value);
 int fastcom_set_sample_rate_pcie(struct serialfc_port *port, unsigned value);
@@ -122,6 +128,130 @@ enum FASTCOM_CARD_TYPE fastcom_get_card_type2(struct serialfc_card *card)
 enum FASTCOM_CARD_TYPE fastcom_get_card_type(struct serialfc_port *port)
 {
     return fastcom_get_card_type2(port->card);
+}
+
+int serialfc_set_uart_register(struct serialfc_port *port, unsigned offset,
+			       unsigned char value)
+{
+	return_val_if_untrue(port, -EINVAL);
+
+	iowrite8(value, port->addr + offset);
+
+	return 0;
+}
+
+int serialfc_get_uart_register(struct serialfc_port *port, unsigned offset,
+			       unsigned char *value)
+{
+	return_val_if_untrue(port, -EINVAL);
+	return_val_if_untrue(value, -EINVAL);
+
+	*value = ioread8(port->addr + offset);
+
+	return 0;
+}
+
+int serialfc_set_icr_register(struct serialfc_port *port, unsigned char index,
+				unsigned char value)
+{
+	unsigned char orig_lcr;
+
+	return_val_if_untrue(port, -EINVAL);
+
+	orig_lcr = ioread8(port->addr + LCR_OFFSET);
+
+	iowrite8(0, port->addr + LCR_OFFSET);
+	iowrite8(index, port->addr + SPR_OFFSET);
+	iowrite8(value, port->addr + ICR_OFFSET);
+
+	if (index == ACR_OFFSET)
+		port->ACR = value;
+
+	iowrite8(orig_lcr, port->addr + LCR_OFFSET);
+
+	return 0;
+}
+
+int serialfc_get_icr_register(struct serialfc_port *port, unsigned char index,
+			      unsigned char *value)
+{
+	unsigned char orig_lcr;
+
+	return_val_if_untrue(port, -EINVAL);
+	return_val_if_untrue(value, -EINVAL);
+
+	orig_lcr = ioread8(port->addr + LCR_OFFSET);
+
+	iowrite8(0, port->addr + LCR_OFFSET);
+	iowrite8(ACR_OFFSET, port->addr + SPR_OFFSET);
+	iowrite8(port->ACR | 0x40, port->addr + ICR_OFFSET);
+	iowrite8(index, port->addr + SPR_OFFSET);
+	*value = ioread8(port->addr + ICR_OFFSET);
+	iowrite8(ACR_OFFSET, port->addr + SPR_OFFSET);
+	iowrite8(port->ACR, port->addr + ICR_OFFSET);
+	iowrite8(orig_lcr, port->addr + LCR_OFFSET);
+
+	return 0;
+}
+
+int str_to_uart_register_offset(const char *name)
+{
+	if (strcmp(name, "ier") == 0)
+		return IER_OFFSET;
+	else if (strcmp(name, "fcr") == 0)
+		return FCR_OFFSET;
+	else if (strcmp(name, "lcr") == 0)
+		return LCR_OFFSET;
+	else if (strcmp(name, "mcr") == 0)
+		return MCR_OFFSET;
+	else if (strcmp(name, "lsr") == 0)
+		return LSR_OFFSET;
+	else if (strcmp(name, "msr") == 0)
+		return MSR_OFFSET;
+	else if (strcmp(name, "spr") == 0)
+		return SPR_OFFSET;
+	else if (strcmp(name, "fctr") == 0)
+		return UART_EXAR_FCTR;
+	else if (strcmp(name, "txtrg") == 0)
+		return UART_EXAR_TXTRG;
+	else if (strcmp(name, "rxtrg") == 0)
+		return UART_EXAR_RXTRG;
+	else if (strcmp(name, "4xmode") == 0)
+		return UART_EXAR_4XMODE;
+	else if (strcmp(name, "8xmode") == 0)
+		return UART_EXAR_8XMODE;
+	else
+		printk(KERN_NOTICE DEVICE_NAME
+		       " invalid str passed into str_to_uart_register_offset\n");
+
+	return -1;
+}
+
+int str_to_icr_register_offset(const char *name)
+{
+	if (strcmp(name, "acr") == 0)
+		return ACR_OFFSET;
+	else if (strcmp(name, "tcr") == 0)
+		return TCR_OFFSET;
+	else if (strcmp(name, "cks") == 0)
+		return CKS_OFFSET;
+	else if (strcmp(name, "ttl") == 0)
+		return TTL_OFFSET;
+	else if (strcmp(name, "rtl") == 0)
+		return RTL_OFFSET;
+	else if (strcmp(name, "mdm") == 0)
+		return MDM_OFFSET;
+	else if (strcmp(name, "ext") == 0)
+		return EXT_OFFSET;
+	else if (strcmp(name, "exth") == 0)
+		return EXTH_OFFSET;
+	else if (strcmp(name, "flr") == 0)
+		return FLR_OFFSET;
+	else
+		printk(KERN_NOTICE DEVICE_NAME
+		       " invalid str passed into str_to_icr_register_offset\n");
+
+	return -1;
 }
 
 int fastcom_set_sample_rate_pci(struct serialfc_port *port, unsigned value)
