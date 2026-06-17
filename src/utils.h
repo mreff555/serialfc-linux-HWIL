@@ -121,5 +121,6 @@ int serialfc_get_icr_register(struct serialfc_port *port, unsigned char index,
 			      unsigned char *value);
 int str_to_uart_register_offset(const char *name);
 int str_to_icr_register_offset(const char *name);
+int serialfc_uart_register_is_read_only(unsigned offset);
 
 #endif

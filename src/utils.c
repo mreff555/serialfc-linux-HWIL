@@ -254,6 +254,17 @@ int str_to_icr_register_offset(const char *name)
 	return -1;
 }
 
+int serialfc_uart_register_is_read_only(unsigned offset)
+{
+	switch (offset) {
+	case LSR_OFFSET:
+	case MSR_OFFSET:
+		return 1;
+	}
+
+	return 0;
+}
+
 int fastcom_set_sample_rate_pci(struct serialfc_port *port, unsigned value)
 {
     unsigned char current_8x_mode, new_8x_mode;

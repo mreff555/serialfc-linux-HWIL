@@ -91,8 +91,13 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
 	/* The sysfs structures I use in sysfs.c don't work prior to 2.6.25 */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
 
+	if (sysfs_create_group(&port->device->kobj, &port_registers_attr_group)) {
+		dev_err(port->device, "sysfs_create_group (registers)\n");
+		return 0;
+	}
+
 	if (sysfs_create_group(&port->device->kobj, &port_settings_attr_group)) {
-		dev_err(port->device, "sysfs_create_group\n");
+		dev_err(port->device, "sysfs_create_group (settings)\n");
 		return 0;
 	}
 

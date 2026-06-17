@@ -21,6 +21,7 @@
 #ifndef SERIALFC_SYSFS
 #define SERIALFC_SYSFS
 
+extern struct attribute_group port_registers_attr_group;
 extern struct attribute_group port_settings_attr_group;
 
 #endif
