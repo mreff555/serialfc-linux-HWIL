@@ -106,10 +106,11 @@ struct serialfc_port *serialfc_port_new(struct serialfc_card *card, unsigned cha
     fastcom_init_triggers(port);
     
     switch (fastcom_get_card_type(port)) {
-    case CARD_TYPE_PCI:
+    case CARD_TYPE_PCI: {
     	unsigned long default_pci_bits = PCI_29MHZ_BITS;
     	fastcom_set_clock_bits_pci(port, default_pci_bits);
     	break;
+    }
     default:
         break;
     }

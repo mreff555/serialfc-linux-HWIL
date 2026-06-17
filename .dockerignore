@@ -1,0 +1,11 @@
+.git
+*.ko
+*.o
+*.mod
+*.mod.c
+*.cmd
+.*.cmd
+.tmp_versions
+*.symvers
+*.order
+*.markers
